@@ -128,6 +128,56 @@
 			const verdictEl = document.getElementById('verdict')!;
 			const errorEl = document.getElementById('error-msg') as HTMLParagraphElement;
 
+			const TRUSTED_AVATAR_ORIGINS = ['https://avatars.githubusercontent.com', 'https://github.com'];
+
+			function safeAvatarUrl(raw: unknown, username: string): string {
+				if (typeof raw === 'string') {
+					try {
+						const url = new URL(raw);
+						if (url.protocol === 'https:' && TRUSTED_AVATAR_ORIGINS.some(o => raw.startsWith(o))) {
+							return raw;
+						}
+					} catch {
+						// fall through to default
+					}
+				}
+				return `https://github.com/${encodeURIComponent(username)}.png`;
+			}
+
+			function buildCard(username: string, score: number, avatar: string, isWinner: boolean): HTMLDivElement {
+				const card = document.createElement('div');
+				card.className = `card${isWinner ? ' winner' : ''}`;
+
+				const img = document.createElement('img');
+				img.src = avatar;
+				img.alt = username;
+				img.width = 80;
+				img.height = 80;
+
+				const nameEl = document.createElement('div');
+				nameEl.className = 'username';
+				nameEl.textContent = `@${username}`;
+
+				const scoreEl = document.createElement('div');
+				scoreEl.className = 'score';
+				scoreEl.textContent = score.toLocaleString();
+
+				const labelEl = document.createElement('div');
+				labelEl.className = 'score-label';
+				labelEl.textContent = 'contributions';
+
+				card.append(img, nameEl, scoreEl, labelEl);
+
+				if (isWinner) {
+					const badge = document.createElement('span');
+					badge.className = 'badge';
+					badge.textContent = '🏆 Winner';
+					card.appendChild(badge);
+				}
+
+				return card;
+			}
+
 			btn.addEventListener('click', async () => {
 				const u1 = p1Input.value.trim();
 				const u2 = p2Input.value.trim();
@@ -156,29 +206,17 @@
 					const score1: number = typeof d1.contributions === 'number' ? d1.contributions : 0;
 					const score2: number = typeof d2.contributions === 'number' ? d2.contributions : 0;
 
-					const avatar1: string = d1.avatar || `https://github.com/${encodeURIComponent(u1)}.png`;
-					const avatar2: string = d2.avatar || `https://github.com/${encodeURIComponent(u2)}.png`;
+					const avatar1 = safeAvatarUrl(d1.avatar, u1);
+					const avatar2 = safeAvatarUrl(d2.avatar, u2);
 
 					const p1Wins = score1 > score2;
 					const p2Wins = score2 > score1;
 					const tie = score1 === score2;
 
-					cardsEl.innerHTML = `
-						<div class="card ${p1Wins ? 'winner' : ''}">
-							<img src="${avatar1}" alt="${u1}" />
-							<div class="username">@${u1}</div>
-							<div class="score">${score1.toLocaleString()}</div>
-							<div class="score-label">contributions</div>
-							${p1Wins ? '<span class="badge">🏆 Winner</span>' : ''}
-						</div>
-						<div class="card ${p2Wins ? 'winner' : ''}">
-							<img src="${avatar2}" alt="${u2}" />
-							<div class="username">@${u2}</div>
-							<div class="score">${score2.toLocaleString()}</div>
-							<div class="score-label">contributions</div>
-							${p2Wins ? '<span class="badge">🏆 Winner</span>' : ''}
-						</div>
-					`;
+					cardsEl.replaceChildren(
+						buildCard(u1, score1, avatar1, p1Wins),
+						buildCard(u2, score2, avatar2, p2Wins),
+					);
 
 					verdictEl.textContent = tie
 						? "It's a tie! 🤝"
