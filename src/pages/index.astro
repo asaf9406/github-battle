@@ -201,10 +201,16 @@
 						fetch(`/api/contributions/${encodeURIComponent(u2)}`),
 					]);
 
+					if (!r1.ok) throw new Error(`Could not fetch data for @${u1} (${r1.status})`);
+					if (!r2.ok) throw new Error(`Could not fetch data for @${u2} (${r2.status})`);
+
 					const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
 
-					const score1: number = typeof d1.contributions === 'number' ? d1.contributions : 0;
-					const score2: number = typeof d2.contributions === 'number' ? d2.contributions : 0;
+					if (typeof d1.contributions !== 'number') throw new Error(`No contribution data returned for @${u1}`);
+					if (typeof d2.contributions !== 'number') throw new Error(`No contribution data returned for @${u2}`);
+
+					const score1: number = d1.contributions;
+					const score2: number = d2.contributions;
 
 					const avatar1 = safeAvatarUrl(d1.avatar, u1);
 					const avatar2 = safeAvatarUrl(d2.avatar, u2);
@@ -223,8 +229,8 @@
 						: `🏆 @${p1Wins ? u1 : u2} wins!`;
 
 					resultsEl.classList.add('visible');
-				} catch {
-					errorEl.textContent = 'Something went wrong. Please try again.';
+				} catch (err) {
+					errorEl.textContent = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
 					errorEl.hidden = false;
 				} finally {
 					btn.disabled = false;
