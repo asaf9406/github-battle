@@ -8,10 +8,238 @@
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Mona Mayhem</title>
+		<title>GitHub Battle</title>
+		<style>
+			*, *::before, *::after { box-sizing: border-box; }
+
+			body {
+				font-family: sans-serif;
+				max-width: 700px;
+				margin: 2rem auto;
+				padding: 0 1rem;
+				color: #24292f;
+			}
+
+			h1 { text-align: center; margin-bottom: 0.25rem; }
+			.subtitle { text-align: center; color: #57606a; margin-bottom: 2rem; }
+
+			.players {
+				display: flex;
+				gap: 1rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.player {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			.player label { font-weight: 600; }
+
+			.player input {
+				padding: 0.5rem 0.75rem;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				font-size: 1rem;
+				width: 100%;
+			}
+
+			.battle-btn {
+				display: block;
+				width: 100%;
+				padding: 0.65rem;
+				background: #2da44e;
+				color: #fff;
+				border: none;
+				border-radius: 6px;
+				font-size: 1rem;
+				cursor: pointer;
+				margin-bottom: 2rem;
+			}
+			.battle-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+			.battle-btn:not(:disabled):hover { background: #2c974b; }
+
+			#results { display: none; }
+			#results.visible { display: block; }
+
+			.result-cards {
+				display: flex;
+				gap: 1rem;
+				margin-bottom: 1rem;
+			}
+
+			.card {
+				flex: 1;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				padding: 1rem;
+				text-align: center;
+			}
+			.card.winner { border-color: #2da44e; background: #f0fff4; }
+
+			.card img {
+				width: 80px;
+				height: 80px;
+				border-radius: 50%;
+				margin-bottom: 0.5rem;
+			}
+
+			.card .username { font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem; }
+			.card .score { font-size: 1.4rem; color: #2da44e; font-weight: 700; }
+			.card .score-label { font-size: 0.8rem; color: #57606a; }
+			.badge { display: inline-block; background: #2da44e; color: #fff; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.75rem; margin-top: 0.4rem; }
+
+			#verdict { text-align: center; font-size: 1.1rem; font-weight: 600; }
+			#error-msg { color: #cf222e; text-align: center; margin-bottom: 1rem; }
+		</style>
 	</head>
 	<body>
-		<h1>Mona Mayhem</h1>
-		<p>Welcome to Mona Mayhem! Time to build a GitHub Contribution Battle Arena.</p>
+		<h1><span aria-hidden="true">⚔️ </span>GitHub Battle</h1>
+		<p class="subtitle">GitHub Contribution Battle Arena — who contributed more?</p>
+
+		<div class="players">
+			<div class="player">
+				<label for="player1">Player 1</label>
+				<input id="player1" type="text" placeholder="GitHub username" autocomplete="off" />
+			</div>
+			<div class="player">
+				<label for="player2">Player 2</label>
+				<input id="player2" type="text" placeholder="GitHub username" autocomplete="off" />
+			</div>
+		</div>
+
+		<button class="battle-btn" id="battleBtn" aria-label="Battle!"><span aria-hidden="true">⚔️ </span>Battle!</button>
+
+		<p id="error-msg" hidden></p>
+
+		<div id="results">
+			<div class="result-cards" id="cards"></div>
+			<p id="verdict"></p>
+		</div>
+
+		<script>
+			const btn = document.getElementById('battleBtn') as HTMLButtonElement;
+			const p1Input = document.getElementById('player1') as HTMLInputElement;
+			const p2Input = document.getElementById('player2') as HTMLInputElement;
+			const resultsEl = document.getElementById('results')!;
+			const cardsEl = document.getElementById('cards')!;
+			const verdictEl = document.getElementById('verdict')!;
+			const errorEl = document.getElementById('error-msg') as HTMLParagraphElement;
+
+			const TRUSTED_AVATAR_ORIGINS = ['https://avatars.githubusercontent.com', 'https://github.com'];
+
+			function safeAvatarUrl(raw: unknown, username: string): string {
+				if (typeof raw === 'string') {
+					try {
+						const url = new URL(raw);
+						if (url.protocol === 'https:' && TRUSTED_AVATAR_ORIGINS.some(o => raw.startsWith(o))) {
+							return raw;
+						}
+					} catch {
+						// fall through to default
+					}
+				}
+				return `https://github.com/${encodeURIComponent(username)}.png`;
+			}
+
+			function buildCard(username: string, score: number, avatar: string, isWinner: boolean): HTMLDivElement {
+				const card = document.createElement('div');
+				card.className = `card${isWinner ? ' winner' : ''}`;
+
+				const img = document.createElement('img');
+				img.src = avatar;
+				img.alt = username;
+				img.width = 80;
+				img.height = 80;
+
+				const nameEl = document.createElement('div');
+				nameEl.className = 'username';
+				nameEl.textContent = `@${username}`;
+
+				const scoreEl = document.createElement('div');
+				scoreEl.className = 'score';
+				scoreEl.textContent = score.toLocaleString();
+
+				const labelEl = document.createElement('div');
+				labelEl.className = 'score-label';
+				labelEl.textContent = 'contributions';
+
+				card.append(img, nameEl, scoreEl, labelEl);
+
+				if (isWinner) {
+					const badge = document.createElement('span');
+					badge.className = 'badge';
+					badge.textContent = '🏆 Winner';
+					card.appendChild(badge);
+				}
+
+				return card;
+			}
+
+			btn.addEventListener('click', async () => {
+				const u1 = p1Input.value.trim();
+				const u2 = p2Input.value.trim();
+
+				errorEl.hidden = true;
+				errorEl.textContent = '';
+				resultsEl.classList.remove('visible');
+
+				if (!u1 || !u2) {
+					errorEl.textContent = 'Please enter both usernames.';
+					errorEl.hidden = false;
+					return;
+				}
+
+				btn.disabled = true;
+				btn.textContent = 'Battling…';
+
+				try {
+					const [r1, r2] = await Promise.all([
+						fetch(`/api/contributions/${encodeURIComponent(u1)}`),
+						fetch(`/api/contributions/${encodeURIComponent(u2)}`),
+					]);
+
+					if (!r1.ok) throw new Error(`Could not fetch data for @${u1} (${r1.status})`);
+					if (!r2.ok) throw new Error(`Could not fetch data for @${u2} (${r2.status})`);
+
+					const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+
+					if (typeof d1.contributions !== 'number') throw new Error(`No contribution data returned for @${u1}`);
+					if (typeof d2.contributions !== 'number') throw new Error(`No contribution data returned for @${u2}`);
+
+					const score1: number = d1.contributions;
+					const score2: number = d2.contributions;
+
+					const avatar1 = safeAvatarUrl(d1.avatar, u1);
+					const avatar2 = safeAvatarUrl(d2.avatar, u2);
+
+					const p1Wins = score1 > score2;
+					const p2Wins = score2 > score1;
+					const tie = score1 === score2;
+
+					cardsEl.replaceChildren(
+						buildCard(u1, score1, avatar1, p1Wins),
+						buildCard(u2, score2, avatar2, p2Wins),
+					);
+
+					verdictEl.textContent = tie
+						? "It's a tie! 🤝"
+						: `🏆 @${p1Wins ? u1 : u2} wins!`;
+
+					resultsEl.classList.add('visible');
+				} catch (err) {
+					errorEl.textContent = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+					errorEl.hidden = false;
+				} finally {
+					btn.disabled = false;
+					const icon = document.createElement('span');
+					icon.setAttribute('aria-hidden', 'true');
+					icon.textContent = '⚔️ ';
+					btn.replaceChildren(icon, document.createTextNode('Battle!'));
+				}
+			});
+		</script>
 	</body>
 </html>
