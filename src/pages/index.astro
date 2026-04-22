@@ -96,7 +96,7 @@
 		</style>
 	</head>
 	<body>
-		<h1>⚔️ GitHub Battle</h1>
+		<h1><span aria-hidden="true">⚔️ </span>GitHub Battle</h1>
 		<p class="subtitle">GitHub Contribution Battle Arena — who contributed more?</p>
 
 		<div class="players">
@@ -110,7 +110,7 @@
 			</div>
 		</div>
 
-		<button class="battle-btn" id="battleBtn">⚔️ Battle!</button>
+		<button class="battle-btn" id="battleBtn" aria-label="Battle!"><span aria-hidden="true">⚔️ </span>Battle!</button>
 
 		<p id="error-msg" hidden></p>
 
@@ -234,7 +234,10 @@
 					errorEl.hidden = false;
 				} finally {
 					btn.disabled = false;
-					btn.textContent = '⚔️ Battle!';
+					const icon = document.createElement('span');
+					icon.setAttribute('aria-hidden', 'true');
+					icon.textContent = '⚔️ ';
+					btn.replaceChildren(icon, document.createTextNode('Battle!'));
 				}
 			});
 		</script>
